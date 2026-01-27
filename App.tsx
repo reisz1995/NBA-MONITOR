@@ -47,13 +47,13 @@ const App: React.FC = () => {
   const parseStreakToRecord = (streakStr: string): GameResult[] | null => {
     if (!streakStr) return null;
     const match = streakStr.match(/([WLVD])(\d+)/i);
-    
+
     if (match) {
       const type = match[1].toUpperCase();
       const count = Math.min(parseInt(match[2], 10), 5);
       const winChar = (type === 'W' || type === 'V') ? 'V' : 'D';
       const lossChar = winChar === 'V' ? 'D' : 'V';
-      
+
       const record: GameResult[] = new Array(5).fill(lossChar);
       for (let i = 0; i < count; i++) {
         record[4 - i] = winChar;
@@ -94,9 +94,9 @@ const App: React.FC = () => {
 
       let targetKey = Array.from(baseMap.keys()).find(key => name.includes(key) || key.includes(name)) || name;
       const existing = baseMap.get(targetKey) || {};
-      
-      baseMap.set(targetKey, { 
-        ...existing, 
+
+      baseMap.set(targetKey, {
+        ...existing,
         ...d,
         vitorias: d.v ?? d.vitorias ?? d.V ?? d.wins ?? existing.vitorias,
         derrotas: d.d ?? d.derrotas ?? d.D ?? d.losses ?? existing.derrotas,
@@ -120,29 +120,57 @@ const App: React.FC = () => {
   }, [espnDataRaw]);
 
   const mergedTeams = useMemo(() => {
-    return INITIAL_TEAMS.map(initial => {
-      const dbTeam = dbTeams.find((t: any) => t.id === initial.id);
+    // Agora a base é o dbTeams (Supabase)
+    return dbTeams.map((dbTeam: any) => {
+      // 1. Encontrar o time correspondente nas constantes (por NOME) para Logo e Nome Oficial
+      // Isso é necessário porque os IDs do DB podem não bater com os das constantes
+      const dbNameClean = (dbTeam.name || dbTeam.nome || '').toLowerCase();
+      const initial = INITIAL_TEAMS.find(t => {
+        const initNameClean = t.name.toLowerCase();
+        return dbNameClean.includes(initNameClean) || initNameClean.includes(dbNameClean);
+      }) || {
+        name: dbTeam.name || dbTeam.nome || 'Time Desconhecido',
+        logo: 'https://a.espncdn.com/i/teamlogos/nba/500/nba.png',
+        record: [],
+        wins: 0,
+        losses: 0,
+        conference: dbTeam.conference || 'East'
+      };
+
+      // 2. Encontrar dados da ESPN (apenas para métricas extras como PPG)
       const espnStats = espnData.find(e => {
         const teamName = (e.time || '').toLowerCase();
         const initialName = initial.name.toLowerCase();
         return teamName === initialName || teamName.includes(initialName) || initialName.includes(teamName);
       });
 
-      let currentRecord = dbTeam?.record || initial.record || [];
-      let currentWins = dbTeam?.wins ?? initial.wins;
-      let currentLosses = dbTeam?.losses ?? initial.losses;
+      // 3. PRIORIDADE ABSOLUTA: Supabase (dados reais)
+      // Se o banco tiver dados, usamos o do banco. Fallback para ESPN apenas se nulo.
+      const currentWins = dbTeam.wins !== undefined && dbTeam.wins !== null ? dbTeam.wins : (espnStats?.vitorias ?? initial.wins);
+      const currentLosses = dbTeam.losses !== undefined && dbTeam.losses !== null ? dbTeam.losses : (espnStats?.derrotas ?? initial.losses);
 
-      if (espnStats) {
-        currentWins = Number(espnStats.vitorias);
-        currentLosses = Number(espnStats.derrotas);
+      // --- RECORD (ÚLTIMOS 5 JOGOS) ---
+      let currentRecord: GameResult[] = [];
+
+      // PRIORIDADE 1: Record real no banco
+      if (dbTeam?.record && Array.isArray(dbTeam.record) && dbTeam.record.length > 0) {
+        currentRecord = dbTeam.record;
+      }
+      // PRIORIDADE 2: Fallback usando string da ESPN
+      else if (espnStats?.ultimos_5) {
         const parsedRecord = parseStreakToRecord(espnStats.ultimos_5);
         if (parsedRecord) currentRecord = parsedRecord;
       }
+      // PRIORIDADE 3: Inicial
+      else {
+        currentRecord = initial.record || [];
+      }
 
-      return { 
-        ...initial,
+      return {
         ...dbTeam,
-        logo: initial.logo, // IMPORTANTE: Sempre usa a logo das constantes para evitar imagens quebradas do DB
+        ...initial, // Sobrescreve Nome e Logo para garantir consistência visual baseada nas constantes
+        name: initial.name,
+        logo: initial.logo,
         record: currentRecord,
         wins: currentWins,
         losses: currentLosses,
@@ -174,7 +202,7 @@ const App: React.FC = () => {
     const wasWin = oldRecord[recordIndex] === 'V';
     const newRecord = [...oldRecord];
     newRecord[recordIndex] = wasWin ? 'D' : 'V';
-    
+
     mutateTeams((prev: any) => {
       return prev?.map((t: any) => t.id === teamId ? { ...t, record: newRecord } : t) || [];
     }, false);
@@ -208,46 +236,46 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4 md:gap-6">
             {/* Logo Container */}
             <div className="relative flex flex-col items-center justify-center w-12 h-12 md:w-14 md:h-14 shrink-0">
-               {/* Crown */}
-               <svg className="w-8 h-8 md:w-10 md:h-10 text-orange-500 absolute -top-1 md:-top-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 11l2-4 3 3 4-3 2 4 3-5 1 12H4l1-12z" />
-                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 18h16" />
-               </svg>
-               {/* Ball */}
-               <svg className="w-10 h-10 md:w-12 md:h-12 text-orange-500 mt-3 md:mt-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                   <circle cx="12" cy="12" r="9" />
-                   <path d="M12 3c0 6-2 9-2 9s2 3 2 9" />
-                   <path d="M3 12h18" />
-                   <path d="M12 3a15 15 0 0 1 0 18" opacity="0.5" />
-                   <path d="M12 21a15 15 0 0 0 0-18" opacity="0.5" />
-                   <path d="M19.5 7a9 9 0 0 0-7.5 5" />
-                   <path d="M4.5 7a9 9 0 0 1 7.5 5" />
-               </svg>
+              {/* Crown */}
+              <svg className="w-8 h-8 md:w-10 md:h-10 text-orange-500 absolute -top-1 md:-top-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 11l2-4 3 3 4-3 2 4 3-5 1 12H4l1-12z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 18h16" />
+              </svg>
+              {/* Ball */}
+              <svg className="w-10 h-10 md:w-12 md:h-12 text-orange-500 mt-3 md:mt-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 3c0 6-2 9-2 9s2 3 2 9" />
+                <path d="M3 12h18" />
+                <path d="M12 3a15 15 0 0 1 0 18" opacity="0.5" />
+                <path d="M12 21a15 15 0 0 0 0-18" opacity="0.5" />
+                <path d="M19.5 7a9 9 0 0 0-7.5 5" />
+                <path d="M4.5 7a9 9 0 0 1 7.5 5" />
+              </svg>
             </div>
 
             <div className="flex flex-col -space-y-0.5 md:-space-y-1">
-               <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-orange-500 uppercase font-['Inter'] leading-none drop-shadow-md">
-                 NBA MONITOR
-               </h1>
-               <div className="flex items-center gap-2">
-                 {/* Runner Icon */}
-                 <svg className="w-3 h-3 md:w-4 md:h-4 text-rose-500" fill="currentColor" viewBox="0 0 24 24">
-                   <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7" />
-                 </svg>
-                 <span className="text-[10px] md:text-xs font-bold text-rose-500 uppercase tracking-[0.2em] md:tracking-[0.3em]">
-                   Live Scores & Stats 🏆
-                 </span>
-               </div>
+              <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-orange-500 uppercase font-['Inter'] leading-none drop-shadow-md">
+                NBA MONITOR
+              </h1>
+              <div className="flex items-center gap-2">
+                {/* Runner Icon */}
+                <svg className="w-3 h-3 md:w-4 md:h-4 text-rose-500" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7" />
+                </svg>
+                <span className="text-[10px] md:text-xs font-bold text-rose-500 uppercase tracking-[0.2em] md:tracking-[0.3em]">
+                  Live Scores & Stats 🏆
+                </span>
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-             {selectedTeamIds.length > 0 && (
-               <div className="hidden md:flex items-center gap-2 bg-orange-500/10 px-3 py-1.5 rounded-full border border-orange-500/20 ml-2 animate-in fade-in slide-in-from-right-4">
-                 <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest">{selectedTeamIds.length} / 2 Times</span>
-                 <button onClick={() => setSelectedTeamIds([])} className="text-orange-400 hover:text-white text-xs font-bold">✕</button>
-               </div>
-             )}
+            {selectedTeamIds.length > 0 && (
+              <div className="hidden md:flex items-center gap-2 bg-orange-500/10 px-3 py-1.5 rounded-full border border-orange-500/20 ml-2 animate-in fade-in slide-in-from-right-4">
+                <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest">{selectedTeamIds.length} / 2 Times</span>
+                <button onClick={() => setSelectedTeamIds([])} className="text-orange-400 hover:text-white text-xs font-bold">✕</button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -263,16 +291,16 @@ const App: React.FC = () => {
                 Ordenado por: <span className="text-orange-400 font-bold underline decoration-2 underline-offset-4">Momento Recente</span> seguido de Vitórias Totais.
               </p>
             </div>
-            
+
             {loadingTeams && dbTeams.length === 0 ? (
               <div className="h-64 bg-slate-800/20 animate-pulse rounded-2xl border border-slate-800" />
             ) : (
               <>
-                <StandingsTable 
-                  teams={sortedTeams} 
-                  selectedTeams={selectedTeamIds} 
-                  onToggleRecord={handleToggleRecord} 
-                  onToggleSelect={toggleTeamSelection} 
+                <StandingsTable
+                  teams={sortedTeams}
+                  selectedTeams={selectedTeamIds}
+                  onToggleRecord={handleToggleRecord}
+                  onToggleSelect={toggleTeamSelection}
                 />
                 <ESPNTable teams={sortedTeams} selectedTeams={selectedTeamIds} />
               </>
@@ -280,23 +308,23 @@ const App: React.FC = () => {
           </div>
 
           <aside className="lg:col-span-1 h-fit lg:sticky lg:top-24 space-y-6">
-            <Scoreboard 
-              playerStats={playerStats} 
-              loading={loadingPlayers} 
-              teams={mergedTeams} 
-              onRefresh={() => mutatePlayers()} 
+            <Scoreboard
+              playerStats={playerStats}
+              loading={loadingPlayers}
+              teams={mergedTeams}
+              onRefresh={() => mutatePlayers()}
             />
-            
-            <UnavailablePlayers 
-              players={unavailablePlayers} 
-              loading={loadingUnavailable} 
-              teams={mergedTeams} 
-              onRefresh={() => mutateUnavailable()} 
+
+            <UnavailablePlayers
+              players={unavailablePlayers}
+              loading={loadingUnavailable}
+              teams={mergedTeams}
+              onRefresh={() => mutateUnavailable()}
             />
-            
-            <AnalysisPanel 
-              insights={insights} 
-              loading={loadingInsights} 
+
+            <AnalysisPanel
+              insights={insights}
+              loading={loadingInsights}
               onRefresh={async () => {
                 setLoadingInsights(true);
                 try {
@@ -304,19 +332,19 @@ const App: React.FC = () => {
                   setInsights(results);
                 } catch (e) { console.error(e); }
                 setLoadingInsights(false);
-              }} 
+              }}
             />
           </aside>
         </div>
       </main>
 
       {comparisonTeams && (
-        <TeamComparison 
-          teamA={comparisonTeams.teamA} 
-          teamB={comparisonTeams.teamB} 
+        <TeamComparison
+          teamA={comparisonTeams.teamA}
+          teamB={comparisonTeams.teamB}
           playerStats={playerStats}
           unavailablePlayers={unavailablePlayers}
-          onClose={() => setSelectedTeamIds([])} 
+          onClose={() => setSelectedTeamIds([])}
         />
       )}
 

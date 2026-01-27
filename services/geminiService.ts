@@ -38,6 +38,7 @@ Objetivo: Ajudar usuários a entenderem o cenário atual (Jan 2026), desempenho 
 
 Diretrizes de Resposta:
 - Sempre priorize os dados: Use as ferramentas para buscar os fatos. Nunca invente estatísticas.
+- A FONTE DA VERDADE para classificação, vitórias, derrotas e histórico recente (últimos 5 jogos) é a tabela 'teams' do banco de dados. Use a tool 'get_standings' para consultá-la.
 - alertar quando o jogo tende a ser under e qunado pode ser over.
 - APLIQUE A MARGEM DE SEGURANÇA: Over (-15%) / Under (+20%).
 - Filtragem de Jogadores: Escolha jogadores consistentes que raramente ficam abaixo de suas médias.
@@ -89,10 +90,11 @@ async function handleNbaFunctionCall(name: string, args: any) {
   try {
     switch (name) {
       case "get_standings": {
-        let query = supabase.from('classificacao_nba').select('*');
-        if (args.conf) query = query.eq('conf', args.conf);
-        if (args.time) query = query.ilike('time', `%${args.time}%`);
-        const { data } = await query.order('vitorias', { ascending: false });
+        // Agora consultamos a tabela 'teams' que contém os dados reais de vitórias/derrotas
+        let query = supabase.from('teams').select('*');
+        if (args.conf) query = query.eq('conference', args.conf);
+        if (args.time) query = query.ilike('name', `%${args.time}%`);
+        const { data } = await query.order('wins', { ascending: false });
         return data;
       }
       case "get_injuries": {
@@ -269,7 +271,7 @@ export const compareTeams = async (teamA: Team, teamB: Team, playerStats: Player
 Objetivo: Prever vencedor e fatores decisivos com base em dados de Jan/2026.
 
 Diretrizes Críticas:
-1. PRIORIDADE AOS DADOS: Use stats reais. Não alucine.
+1. PRIORIDADE AOS DADOS: Use stats reais. A tabela 'teams' contém os dados oficiais de vitórias, derrotas e o histórico real dos últimos jogos. Analise-os para determinar a forma atual do time.
 2. MARGEM DE SEGURANÇA & APOSTAS:
    - Over: Aplique desconto de -15% na média.
    - Under: Adicione +20% de margem.
@@ -297,7 +299,10 @@ Saída JSON Obrigatória (conforme schema).`;
 
   const prompt = `Analise o confronto tático: ${teamA.name} vs ${teamB.name}.
   Contexto de Lesões (Jogadores Fora): ${injuries.map(p => `${p.player_name || p.nome}`).join(', ') || 'Nenhum relevante'}.
-  Estatísticas Base:
+  Estatísticas Reais (Tabela Oficial Teams):
+  - ${teamA.name}: ${teamA.wins}V - ${teamA.losses}D | Últimos 5: ${teamA.record.join(', ')}
+  - ${teamB.name}: ${teamB.wins}V - ${teamB.losses}D | Últimos 5: ${teamB.record.join(', ')}
+  Métricas Adicionais (ESPN):
   - ${teamA.name}: Ataque ${teamA.stats?.media_pontos_ataque || 'N/A'}, Defesa ${teamA.stats?.media_pontos_defesa || 'N/A'}. 
   - ${teamB.name}: Ataque ${teamB.stats?.media_pontos_ataque || 'N/A'}, Defesa ${teamB.stats?.media_pontos_defesa || 'N/A'}.`;
 
