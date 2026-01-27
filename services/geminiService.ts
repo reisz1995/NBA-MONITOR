@@ -33,12 +33,10 @@ const extractSources = (response: GenerateContentResponse): Source[] => {
   return sources;
 };
 
-const SYSTEM_INSTRUCTION = `Role: Você é o "Estatístico Chefe do NBA Hub", um assistente analítico especializado em fornecer insights baseados em dados reais da NBA.
-Objetivo: Ajudar usuários a entenderem o cenário atual (Jan 2026), desempenho e impacto de lesões com tom profissional e entusiasta.
+const SYSTEM_INSTRUCTION = `Você é o "Estatístico Chefe do NBA Hub", um assistente analítico especializado em fornecer insights baseados em dados reais da NBA. Seu objetivo é ajudar os usuários a entenderem o cenário atual da liga, desempenho de jogadores e impacto de lesões.
 
 Diretrizes de Resposta:
 - Sempre priorize os dados: Use as ferramentas para buscar os fatos. Nunca invente estatísticas.
-- A FONTE DA VERDADE para classificação, vitórias, derrotas e histórico recente (últimos 5 jogos) é a tabela 'teams' do banco de dados. Use a tool 'get_standings' para consultá-la.
 - alertar quando o jogo tende a ser under e qunado pode ser over.
 - APLIQUE A MARGEM DE SEGURANÇA: Over (-15%) / Under (+20%).
 - Filtragem de Jogadores: Escolha jogadores consistentes que raramente ficam abaixo de suas médias.
@@ -54,8 +52,8 @@ Diretrizes de Resposta:
 - Formatação: Use tabelas Markdown para comparações.`;
 export const nbaTools: FunctionDeclaration[] = [
   {
-    name: "get_standings",
-    description: "Retorna a tabela de classificação da NBA (vitórias, derrotas, conferência, etc).",
+    name: "get_classificacao_nba",
+    description: "Retorna vitórias, derrotas, pontos de ataque, pontos de defesa, conferência e aproveitamento.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -65,8 +63,8 @@ export const nbaTools: FunctionDeclaration[] = [
     }
   },
   {
-    name: "get_injuries",
-    description: "Busca a lista de jogadores lesionados e o status.",
+    name: "get_nba_injured_playerss",
+    description: "Lista desfalques e gravidade (Out, Day-To-Day).",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -75,12 +73,22 @@ export const nbaTools: FunctionDeclaration[] = [
     }
   },
   {
-    name: "get_player_stats",
-    description: "Obtém médias de pontos, rebotes e assistências de jogadores.",
+    name: "get_nba_jogadores_stats",
+    description: "Obtém médias de pontos, rebotes e assistências dos jogadores.",
     parameters: {
       type: Type.OBJECT,
       properties: {
         nome: { type: Type.STRING, description: "Nome do jogador." }
+      }
+    }
+  },
+  {
+    name: "get_teams",
+    description: "Obtém a sequência dos últimos cinco jogos (vitórias e derrotas) de um time.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING, description: "Nome do time." }
       }
     }
   }
@@ -89,24 +97,29 @@ export const nbaTools: FunctionDeclaration[] = [
 async function handleNbaFunctionCall(name: string, args: any) {
   try {
     switch (name) {
-      case "get_standings": {
-        // Agora consultamos a tabela 'teams' que contém os dados reais de vitórias/derrotas
+      case "get_classificacao_nba": {
         let query = supabase.from('teams').select('*');
         if (args.conf) query = query.eq('conference', args.conf);
         if (args.time) query = query.ilike('name', `%${args.time}%`);
         const { data } = await query.order('wins', { ascending: false });
         return data;
       }
-      case "get_injuries": {
+      case "get_nba_injured_playerss": {
         let query = supabase.from('nba_injured_players').select('*');
         if (args.team_name) query = query.ilike('team_name', `%${args.team_name}%`);
         const { data } = await query;
         return data;
       }
-      case "get_player_stats": {
+      case "get_nba_jogadores_stats": {
         let query = supabase.from('nba_jogadores_stats').select('*');
         if (args.nome) query = query.ilike('nome', `%${args.nome}%`);
         const { data } = await query.limit(5);
+        return data;
+      }
+      case "get_teams": {
+        let query = supabase.from('teams').select('name, record');
+        if (args.name) query = query.ilike('name', `%${args.name}%`);
+        const { data } = await query;
         return data;
       }
       default:
@@ -267,27 +280,24 @@ export const compareTeams = async (teamA: Team, teamB: Team, playerStats: Player
     required: ["winner", "confidence", "keyFactor", "detailedAnalysis"]
   };
 
-  const MATCHUP_SYSTEM_INSTRUCTION = `Role: Você é um Analista Sênior de Estratégia da NBA.
-Objetivo: Prever vencedor e fatores decisivos com base em dados de Jan/2026.
+  const MATCHUP_SYSTEM_INSTRUCTION = `Você é o "Estatístico Chefe do NBA Hub", um assistente analítico especializado em fornecer insights baseados em dados reais da NBA. Seu objetivo é ajudar os usuários a entenderem o cenário atual da liga, desempenho de jogadores e impacto de lesões.
 
-Diretrizes Críticas:
-1. PRIORIDADE AOS DADOS: Use stats reais. A tabela 'teams' contém os dados oficiais de vitórias, derrotas e o histórico real dos últimos jogos. Analise-os para determinar a forma atual do time.
-2. MARGEM DE SEGURANÇA & APOSTAS:
-   - Over: Aplique desconto de -15% na média.
-   - Under: Adicione +20% de margem.
-   - Player Props: Busque jogadores consistentes (que raramente ficam abaixo da média). Ex: Se média é 25, busque lines de "Mais de 19.5" ou "21.5" para segurança.
-   - Alertar quando o jogo tende a ser under e quando pode ser over.
-3. CONTEXTO TÁTICO:
-   - Back-to-Back: O time viajou? Cansaço = Load Management.
-   - Desfalques (Injury Report): Estrela fora? Impacto total nas odds.
-   - Defesa: Time tranca garrafão? Libera chutes de 3.
-   - Ritmo: "Run and Gun" ou foco defensivo? Impacta Over/Under.
-   - Handicap: Analise se a vantagem/desvantagem (+7.5/-7.5) é justa dado o contexto.
-4. FORMATO DE SAÍDA (no campo 'detailedAnalysis'):
-   - Use tabelas Markdown para comparar stats.
-   - Explique o "Raciocínio Cruzado" (lesão X implicou na queda de rendimento Y).
-
-Saída JSON Obrigatória (conforme schema).`;
+Diretrizes de Resposta:
+- Sempre priorize os dados: Use as ferramentas para buscar os fatos. Nunca invente estatísticas.
+- alertar quando o jogo tende a ser under e qunado pode ser over.
+- APLIQUE A MARGEM DE SEGURANÇA: Over (-15%) / Under (+20%).
+- Filtragem de Jogadores: Escolha jogadores consistentes que raramente ficam abaixo de suas médias.
+- Margem de Segurança: Se a média de pontos de um jogador é 25, procure entrar em linhas de "Mais de 19.5" ou "Mais de 21.5" em bilhetes combinados (duplas) para aumentar a segurança.
+- Back-to-Back: Times que jogaram na noite anterior e viajam para jogar novamente tendem a estar cansados e podem poupar jogadores (o famoso Load Management).
+- Desfalques (Injury Report): No basquete, a ausência de um único jogador estrela muda completamente as odds e o favoritismo.
+- Sistemas Defensivos: Algumas equipes focam em trancar o garrafão, o que diminui pontos de pivôs, mas libera chutes de fora para os alas.
+- Handicap (Vantagem/Desvantagem): É o mercado mais popular. Como há grandes discrepâncias técnicas, a casa dá uma vantagem de pontos ao azarão (Ex: +7.5) ou uma desvantagem ao favorito (Ex: -7.5).
+- Over/Under de Pontos (Totais): Aposta no somatório de pontos das duas equipes. É crucial analisar se os times têm estilo "Run and Gun" (ataque rápido) ou se focam na defesa. 
+- Raciocínio Cruzado: Se um time está mal, verifique lesões (get_injuries).
+- Tom de Voz: Profissional, analítico e entusiasta (use termos como "Double-double", "Clutch", "Playoffs race").
+- Data Atual: Considere que estamos em Janeiro de 2026.
+- Formatação: Use tabelas Markdown para comparações.
+- Saída JSON Obrigatória (conforme schema).`;
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const config = {
