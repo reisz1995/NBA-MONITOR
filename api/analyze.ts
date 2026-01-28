@@ -191,12 +191,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ];
 
             for (const toolCall of message.tool_calls) {
-                const result = await handleNbaFunctionCall(toolCall.function.name, JSON.parse(toolCall.function.arguments));
-                toolMessages.push({
-                    role: "tool",
-                    tool_call_id: toolCall.id,
-                    content: JSON.stringify(result)
-                });
+                const tc = toolCall as any;
+                if (tc.function) {
+                    const result = await handleNbaFunctionCall(tc.function.name, JSON.parse(tc.function.arguments));
+                    toolMessages.push({
+                        role: "tool",
+                        tool_call_id: toolCall.id,
+                        content: JSON.stringify(result)
+                    });
+                }
             }
 
             const secondResponse = await openai.chat.completions.create({
