@@ -122,9 +122,9 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
     const status = (p.status || p.injury_status || p.motivo || '').toLowerCase();
     // Logic from UnavailablePlayers: 'leve' = yellow, 'grave' = red
     if (status.includes('leve') || status.includes('day') || status.includes('questionable') || status.includes('doubtful')) {
-      return 'text-yellow-400 bg-yellow-500/5 border-yellow-500/10';
+      return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
     }
-    return 'text-rose-400 bg-rose-500/5 border-rose-500/10';
+    return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
   };
 
   const handleAuth = async () => {

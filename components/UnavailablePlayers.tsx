@@ -28,10 +28,10 @@ const UnavailablePlayers: React.FC<UnavailablePlayersProps> = ({ players, loadin
 
   const filteredPlayers = useMemo(() => {
     return uniquePlayers.filter(p => {
-       const search = searchQuery.toLowerCase();
-       const name = (p.player_name || p.nome || '').toLowerCase();
-       const team = (p.team_name || p.time || '').toLowerCase();
-       return name.includes(search) || team.includes(search);
+      const search = searchQuery.toLowerCase();
+      const name = (p.player_name || p.nome || '').toLowerCase();
+      const team = (p.team_name || p.time || '').toLowerCase();
+      return name.includes(search) || team.includes(search);
     });
   }, [uniquePlayers, searchQuery]);
 
@@ -44,8 +44,8 @@ const UnavailablePlayers: React.FC<UnavailablePlayersProps> = ({ players, loadin
   });
 
   const getTeamLogo = (teamName: string) => {
-    const team = teams.find(t => 
-      t.name.toLowerCase().includes(teamName.toLowerCase()) || 
+    const team = teams.find(t =>
+      t.name.toLowerCase().includes(teamName.toLowerCase()) ||
       teamName.toLowerCase().includes(t.name.toLowerCase())
     );
     return team?.logo || 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/leagues/500/nba.png';
@@ -79,12 +79,12 @@ const UnavailablePlayers: React.FC<UnavailablePlayersProps> = ({ players, loadin
           </h2>
           <p className="text-[9px] text-slate-500 font-bold uppercase mt-1 tracking-tighter">Relatório de Desfalques 2026</p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <div className="relative group">
-            <input 
-              type="text" 
-              placeholder="Pesquisar..." 
+            <input
+              type="text"
+              placeholder="Pesquisar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-slate-950/50 border border-slate-700 text-[10px] text-white px-3 py-1.5 rounded-lg w-28 focus:w-36 md:w-32 md:focus:w-40 transition-all focus:outline-none focus:border-rose-500 placeholder:text-slate-600 font-medium"
@@ -123,9 +123,10 @@ const UnavailablePlayers: React.FC<UnavailablePlayersProps> = ({ players, loadin
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <h3 className="text-xs font-black text-slate-100 truncate">{d.nome}</h3>
-                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md border uppercase shrink-0 ${
-                        d.gravidade === 'grave' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                      }`}>{d.gravidade}</span>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md border uppercase shrink-0 ${(d.gravidade.includes('out') || d.gravidade.includes('grave'))
+                          ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                          : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                        }`}>{d.gravidade}</span>
                     </div>
                     <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
                       <span className="truncate max-w-[120px]">{d.motivo}</span>
