@@ -13,6 +13,7 @@
     "@google/genai": "^1.35.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.48.1",
+    "@vercel/node": "^5.5.28",
     "openai": "^6.16.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
