@@ -296,7 +296,7 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
               <div className="flex items-center justify-between mb-8">
                 <div className="flex flex-col">
                   <h4 className="text-indigo-400 font-black text-[11px] uppercase tracking-widest">IA Projeção 2026</h4>
-                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">Baseado em Dados ESPN + Google Search + Desfalques</span>
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">Baseado em Dados ESPN + Tavily Pro Search + Desfalques</span>
                 </div>
                 {analysis && (
                   <div className="bg-indigo-600 px-4 py-2 rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.3)]">
@@ -336,19 +336,60 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
                   <div className="flex flex-col md:flex-row md:items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     <span className="text-emerald-400 font-black text-sm uppercase italic tracking-tighter shrink-0">Vencedor Projetado:</span>
                     <span className="text-white font-black text-2xl md:text-3xl underline decoration-indigo-500 decoration-4 underline-offset-8 uppercase italic animate-pulse">{analysis.winner}</span>
+
+                    {analysis.overUnderAlert && (
+                      <div className={`ml-auto px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${analysis.overUnderAlert === 'OVER' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        }`}>
+                        ALERTA {analysis.overUnderAlert}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="p-5 bg-black/40 rounded-2xl border border-white/5 relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Fator Decisivo para 2026:</p>
-                    <p className="text-indigo-100 text-sm md:text-base font-bold leading-relaxed italic group-hover:text-white transition-colors">"{analysis.keyFactor}"</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-5 bg-black/40 rounded-2xl border border-white/5 relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Linha de Segurança:</p>
+                      <p className="text-emerald-400 text-sm md:text-base font-bold leading-relaxed">{analysis.safetyMargin || 'Análise indisponível'}</p>
+                    </div>
+                    <div className="p-5 bg-black/40 rounded-2xl border border-white/5 relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Fator Decisivo:</p>
+                      <p className="text-indigo-100 text-sm font-bold leading-relaxed truncate group-hover:text-white transition-colors">{analysis.keyFactor}</p>
+                    </div>
                   </div>
 
-                  <div className="flex-1 space-y-3">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Análise Estratégica:</p>
-                    <p className="text-slate-400 text-xs md:text-sm leading-relaxed font-medium">
-                      {analysis.detailedAnalysis}
-                    </p>
+                  {analysis.bettingTips && analysis.bettingTips.length > 0 && (
+                    <div className="p-5 bg-slate-800/30 rounded-2xl border border-white/5">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                        Dicas do Estatístico:
+                      </p>
+                      <ul className="space-y-2">
+                        {analysis.bettingTips.map((tip, i) => (
+                          <li key={i} className="text-[11px] text-slate-300 flex gap-2">
+                            <span className="text-indigo-400">•</span> {tip}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="flex-1 space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Análise Estratégica:</p>
+                      <p className="text-slate-400 text-xs md:text-sm leading-relaxed font-medium">
+                        {analysis.detailedAnalysis}
+                      </p>
+                    </div>
+
+                    {analysis.injuryImpact && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black text-rose-500/70 uppercase tracking-widest">Impacto dos Desfalques:</p>
+                        <p className="text-slate-400 text-xs md:text-sm leading-relaxed italic">
+                          {analysis.injuryImpact}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {analysis.sources && analysis.sources.length > 0 && (

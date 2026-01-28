@@ -9,7 +9,6 @@ import TeamComparison from './components/TeamComparison';
 import ESPNTable from './components/ESPNTable';
 import Scoreboard from './components/Scoreboard';
 import UnavailablePlayers from './components/UnavailablePlayers';
-import ChatBot from './components/ChatBot';
 import { analyzeStandings } from './services/geminiService';
 import { supabase } from './lib/supabase';
 
@@ -347,8 +346,6 @@ const App: React.FC = () => {
           onClose={() => setSelectedTeamIds([])}
         />
       )}
-
-      <ChatBot />
     </div>
   );
 };

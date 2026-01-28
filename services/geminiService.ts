@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, FunctionDeclaration, GenerateContentResponse, Chat } from "@google/genai";
+import OpenAI from "openai";
 import { Team, Insight, MatchupAnalysis, Source, PlayerStat } from "../types";
 import { supabase } from "../lib/supabase";
 
@@ -11,6 +11,10 @@ declare global {
   }
 }
 
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true // Since this is a Vite app running in the browser
+});
 
 const cleanJsonOutput = (text: string): string => {
   if (!text) return "[]";
@@ -20,75 +24,101 @@ const cleanJsonOutput = (text: string): string => {
   return clean;
 };
 
-const extractSources = (response: GenerateContentResponse): Source[] => {
-  const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-  const sources: Source[] = [];
-  chunks.forEach((chunk: any) => {
-    if (chunk.web?.uri && chunk.web?.title) {
-      if (!sources.find(s => s.url === chunk.web.uri)) {
-        sources.push({ title: chunk.web.title, url: chunk.web.uri });
-      }
-    }
-  });
-  return sources;
+// Note: OpenAI doesn't standardly return 'groundingMetadata' like Gemini.
+// We'll leave this as an empty extractor or mock it if we add custom tools later.
+const extractSources = (response: any): Source[] => {
+  return [];
 };
 
 const SYSTEM_INSTRUCTION = `Você é o "Estatístico Chefe do NBA Hub", um assistente analítico especializado em fornecer insights baseados em dados reais da NBA. Seu objetivo é ajudar os usuários a entenderem o cenário atual da liga, desempenho de jogadores e impacto de lesões.
 
 Diretrizes de Resposta:
 - Sempre priorize os dados: Use as ferramentas para buscar os fatos. Nunca invente estatísticas.
-- alertar quando o jogo tende a ser under e qunado pode ser over.
+- MÉTRICA DE PESO DOS JOGADORES:
+    * Peso 10: Jogadores estrela/elite (média ~30 pontos ou alto volume de Rebotes + Assistências).
+    * Peso 5: Jogadores de rotação/regulares (média ~10 pontos).
+    * Calcule o peso proporcionalmente para outros valores.
+- IMPACTO NO TOTAL (OVER/UNDER): Se um jogador de **Peso 10** estiver fora (Injury Report), há uma fortíssima tendência para o jogo ser **UNDER**.
+- Alertar quando o jogo tende a ser under e quando pode ser over.
 - APLIQUE A MARGEM DE SEGURANÇA: Over (-15%) / Under (+20%).
 - Filtragem de Jogadores: Escolha jogadores consistentes que raramente ficam abaixo de suas médias.
 - Margem de Segurança: Se a média de pontos de um jogador é 25, procure entrar em linhas de "Mais de 19.5" ou "Mais de 21.5" em bilhetes combinados (duplas) para aumentar a segurança.
 - Back-to-Back: Times que jogaram na noite anterior e viajam para jogar novamente tendem a estar cansados e podem poupar jogadores (o famoso Load Management).
-- Desfalques (Injury Report): No basquete, a ausência de um único jogador estrela muda completamente as odds e o favoritismo.
+- Desfalques (Injury Report): No basquete, a ausência de um único jogador estrela muda completamente as odds e o favoritismo. Use o peso para quantificar esse impacto.
 - Sistemas Defensivos: Algumas equipes focam em trancar o garrafão, o que diminui pontos de pivôs, mas libera chutes de fora para os alas.
 - Handicap (Vantagem/Desvantagem): É o mercado mais popular. Como há grandes discrepâncias técnicas, a casa dá uma vantagem de pontos ao azarão (Ex: +7.5) ou uma desvantagem ao favorito (Ex: -7.5).
 - Over/Under de Pontos (Totais): Aposta no somatório de pontos das duas equipes. É crucial analisar se os times têm estilo "Run and Gun" (ataque rápido) ou se focam na defesa. 
 - Raciocínio Cruzado: Se um time está mal, verifique lesões (get_injuries).
+- Sistema de Busca: Use a ferramenta web_search para buscar notícias de hoje, mas SEMPRE cruze essas informações com os dados das tabelas fornecidas para identificar tendências ou discrepâncias.
 - Tom de Voz: Profissional, analítico e entusiasta (use termos como "Double-double", "Clutch", "Playoffs race").
 - Data Atual: Considere que estamos em Janeiro de 2026.
 - Formatação: Use tabelas Markdown para comparações.`;
-export const nbaTools: FunctionDeclaration[] = [
+
+export const nbaTools: OpenAI.Chat.ChatCompletionTool[] = [
   {
-    name: "get_classificacao_nba",
-    description: "Retorna vitórias, derrotas, pontos de ataque, pontos de defesa, conferência e aproveitamento.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        time: { type: Type.STRING, description: "Nome do time (ex: 'Lakers')" },
-        conf: { type: Type.STRING, description: "Filtrar por 'East' ou 'West'" }
+    type: "function",
+    function: {
+      name: "get_classificacao_nba",
+      description: "Retorna vitórias, derrotas, pontos de ataque, pontos de defesa, conferência e aproveitamento.",
+      parameters: {
+        type: "object",
+        properties: {
+          time: { type: "string", description: "Nome do time (ex: 'Lakers')" },
+          conf: { type: "string", description: "Filtrar por 'East' ou 'West'" }
+        }
       }
     }
   },
   {
-    name: "get_nba_injured_playerss",
-    description: "Lista desfalques e gravidade (Out, Day-To-Day).",
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        team_name: { type: Type.STRING, description: "Nome do time." }
+    type: "function",
+    function: {
+      name: "get_nba_injured_playerss",
+      description: "Lista desfalques e gravidade (Out, Day-To-Day).",
+      parameters: {
+        type: "object",
+        properties: {
+          team_name: { type: "string", description: "Nome do time." }
+        }
       }
     }
   },
   {
-    name: "get_nba_jogadores_stats",
-    description: "Obtém médias de pontos, rebotes e assistências dos jogadores.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        nome: { type: Type.STRING, description: "Nome do jogador." }
+    type: "function",
+    function: {
+      name: "get_nba_jogadores_stats",
+      description: "Obtém médias de pontos, rebotes e assistências dos jogadores.",
+      parameters: {
+        type: "object",
+        properties: {
+          nome: { type: "string", description: "Nome do jogador." }
+        }
       }
     }
   },
   {
-    name: "get_teams",
-    description: "Obtém a sequência dos últimos cinco jogos (vitórias e derrotas) de um time.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        name: { type: Type.STRING, description: "Nome do time." }
+    type: "function",
+    function: {
+      name: "get_teams",
+      description: "Obtém a sequência dos últimos cinco jogos (vitórias e derrotas) de um time.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Nome do time." }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description: "Busca informações em tempo real na web sobre a NBA (notícias, lesões de última hora, odds).",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "A consulta de busca (ex: 'Lakers injury report today')" }
+        },
+        required: ["query"]
       }
     }
   }
@@ -122,81 +152,87 @@ async function handleNbaFunctionCall(name: string, args: any) {
         const { data } = await query;
         return data;
       }
+      case "web_search": {
+        const apiKey = process.env.TAVILY_API_KEY;
+        if (!apiKey) return { error: "Tavily API Key not configured" };
+
+        const response = await fetch("https://api.tavily.com/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key: apiKey,
+            query: args.query,
+            search_depth: "advanced",
+            include_answer: true
+          })
+        });
+        const data = await response.json();
+        return {
+          results: data.results?.map((r: any) => ({ title: r.title, url: r.url, snippet: r.content })),
+          answer: data.answer
+        };
+      }
       default:
         return { error: "Função não encontrada" };
     }
   } catch (err) {
-    return { error: "Erro ao consultar banco de dados" };
+    return { error: "Erro ao executar ferramenta" };
   }
-}
-
-// Fixed: Corrected response parameter type to GenerateContentResponse
-async function handleStreamingFunctionCalls(response: GenerateContentResponse, prompt: string, chat: Chat | null, config: any) {
-  const functionCalls = response.functionCalls;
-  if (functionCalls && functionCalls.length > 0) {
-    const toolResponses = [];
-    for (const call of functionCalls) {
-      const result = await handleNbaFunctionCall(call.name, call.args);
-      toolResponses.push({
-        functionResponse: {
-          name: call.name,
-          id: call.id,
-          response: { content: result }
-        }
-      });
-    }
-    return toolResponses;
-  }
-  return null;
 }
 
 export const analyzeStandings = async (teams: Team[]): Promise<Insight[]> => {
-  const schema = {
-    type: Type.ARRAY,
-    items: {
-      type: Type.OBJECT,
-      properties: {
-        title: { type: Type.STRING },
-        content: { type: Type.STRING },
-        type: { type: Type.STRING, enum: ['prediction', 'analysis', 'warning'] }
-      },
-      required: ["title", "content", "type"]
-    }
-  };
-
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const config = {
-    tools: [{ functionDeclarations: nbaTools }, { googleSearch: {} }],
-    systemInstruction: SYSTEM_INSTRUCTION,
-    responseMimeType: "application/json",
-    responseSchema: schema
-  };
-
   try {
-    let response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: "Gere insights sobre a classificação atual e desfalques na NBA.",
-      config
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: SYSTEM_INSTRUCTION + "\nResponda obrigatoriamente em JSON no formato: { \"insights\": [ { \"title\": \"...\", \"content\": \"...\", \"type\": \"prediction|analysis|warning\" } ] }" },
+        { role: "user", content: "Gere insights sobre a classificação atual e desfalques na NBA." }
+      ],
+      tools: nbaTools,
+      response_format: { type: "json_object" }
     });
 
-    const toolResponses = await handleStreamingFunctionCalls(response, "", null, config);
-    if (toolResponses) {
-      response = await ai.models.generateContent({
-        contents: [
-          { role: 'user', parts: [{ text: "Gere insights sobre a classificação atual e desfalques na NBA." }] },
-          { role: 'model', parts: response.candidates[0].content.parts },
-          { role: 'user', parts: toolResponses }
-        ],
-        model: "gemini-2.0-flash", // Reuse the same model for consistency
-        config
+    let message = response.choices[0].message;
+
+    if (message.tool_calls) {
+      const toolMessages: any[] = [
+        { role: "system", content: SYSTEM_INSTRUCTION },
+        { role: "user", content: "Gere insights sobre a classificação atual e desfalques na NBA." },
+        message
+      ];
+
+      for (const toolCall of message.tool_calls) {
+        const result = await handleNbaFunctionCall(toolCall.function.name, JSON.parse(toolCall.function.arguments));
+        toolMessages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(result)
+        });
+      }
+
+      const secondResponse = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: toolMessages,
+        response_format: { type: "json_object" }
       });
+      message = secondResponse.choices[0].message;
+
+      // Extract sources from web_search if it was called
+      const searchCall = toolMessages.find(m => m.role === 'tool' && m.content.includes('results'));
+      if (searchCall) {
+        const searchResult = JSON.parse(searchCall.content);
+        const data = JSON.parse(cleanJsonOutput(message.content || "{}"));
+        const insights = data.insights || data;
+        if (insights.length > 0) {
+          insights[0].sources = searchResult.results || [];
+        }
+        return insights;
+      }
     }
 
-    if (!response.text) return [];
-    const insights = JSON.parse(cleanJsonOutput(response.text));
-    const sources = extractSources(response);
-    if (insights.length > 0 && sources.length > 0) insights[0].sources = sources;
-    return insights;
+    if (!message.content) return [];
+    const data = JSON.parse(cleanJsonOutput(message.content));
+    return data.insights || data;
   } catch (error) {
     console.error(error);
     return [];
@@ -207,18 +243,9 @@ export async function callGroqFallback(prompt: string, systemInstruction: string
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error("GROQ_API_KEY not configured for fallback.");
 
-  console.log("Using Groq Fallback...");
-
-  // Append schema instruction if it's not a generic analysis
   let finalSystem = systemInstruction;
   if (schema) {
-    finalSystem += `\n\nIMPORTANT: You must respond specifically in JSON format following this structure:
-     {
-       "winner": "Team Name",
-       "confidence": 85,
-       "keyFactor": "Short phrase",
-       "detailedAnalysis": "Long text"
-     }`;
+    finalSystem += `\n\nIMPORTANT: You must respond specifically in JSON format.`;
   }
 
   try {
@@ -249,7 +276,6 @@ export async function callGroqFallback(prompt: string, systemInstruction: string
     if (!content) throw new Error("Empty Groq response");
 
     return JSON.parse(content);
-
   } catch (error) {
     console.error("Groq Fallback Error:", error);
     throw error;
@@ -257,139 +283,99 @@ export async function callGroqFallback(prompt: string, systemInstruction: string
 }
 
 export const compareTeams = async (teamA: Team, teamB: Team, playerStats: PlayerStat[], injuries: any[] = []): Promise<MatchupAnalysis> => {
-  // 1. Check Cache
   const today = new Date().toISOString().split('T')[0];
-  const cacheKey = `analysis_v1_${teamA.id}_${teamB.id}_${today}`;
+  const cacheKey = `analysis_v2_${teamA.id}_${teamB.id}_${today}`;
 
   try {
     const cached = localStorage.getItem(cacheKey);
-    if (cached) {
-      console.log("Using Cached Analysis");
-      return JSON.parse(cached);
-    }
-  } catch (e) { console.warn("Cache unavailable", e); }
+    if (cached) return JSON.parse(cached);
+  } catch (e) { }
 
-  const schema = {
-    type: Type.OBJECT,
-    properties: {
-      winner: { type: Type.STRING },
-      confidence: { type: Type.NUMBER },
-      keyFactor: { type: Type.STRING },
-      detailedAnalysis: { type: Type.STRING }
-    },
-    required: ["winner", "confidence", "keyFactor", "detailedAnalysis"]
-  };
+  const enhancedSystem = SYSTEM_INSTRUCTION + `
+  
+  DIRETRIZES TÉCNICAS ADICIONAIS:
+  - Analise se o jogo tende a ser UNDER ou OVER pontos totais.
+  - USE A MÉTRICA DE PESO: Identifique o peso dos jogadores (Elite = Peso 10, Regular = Peso 5) baseando-se em pontos, rebotes e assistências.
+  - REGRA DO DESFALQUE: Se houver ausência de um jogador de **Peso 10**, a recomendação principal deve tender a **UNDER**.
+  - Calcule e informe a MARGEM DE SEGURANÇA:
+    * Se prever OVER, a linha segura é (Projeção - 15%).
+    * Se prever UNDER, a linha segura é (Projeção + 20%).
+  - Avalie o IMPACTO DAS LESÕES no desempenho defensivo e ofensivo usando os pesos calculados.
+  - Considere o fator CANSAÇO (Back-to-back).
+  - Identifique o SISTEMA DEFENSIVO (tranca garrafão vs libera chutes).
 
-  const MATCHUP_SYSTEM_INSTRUCTION = `Você é o "Estatístico Chefe do NBA Hub", um assistente analítico especializado em fornecer insights baseados em dados reais da NBA. Seu objetivo é ajudar os usuários a entenderem o cenário atual da liga, desempenho de jogadores e impacto de lesões.
-
-Diretrizes de Resposta:
-- Sempre priorize os dados: Use as ferramentas para buscar os fatos. Nunca invente estatísticas.
-- alertar quando o jogo tende a ser under e qunado pode ser over.
-- APLIQUE A MARGEM DE SEGURANÇA: Over (-15%) / Under (+20%).
-- Filtragem de Jogadores: Escolha jogadores consistentes que raramente ficam abaixo de suas médias.
-- Margem de Segurança: Se a média de pontos de um jogador é 25, procure entrar em linhas de "Mais de 19.5" ou "Mais de 21.5" em bilhetes combinados (duplas) para aumentar a segurança.
-- Back-to-Back: Times que jogaram na noite anterior e viajam para jogar novamente tendem a estar cansados e podem poupar jogadores (o famoso Load Management).
-- Desfalques (Injury Report): No basquete, a ausência de um único jogador estrela muda completamente as odds e o favoritismo.
-- Sistemas Defensivos: Algumas equipes focam em trancar o garrafão, o que diminui pontos de pivôs, mas libera chutes de fora para os alas.
-- Handicap (Vantagem/Desvantagem): É o mercado mais popular. Como há grandes discrepâncias técnicas, a casa dá uma vantagem de pontos ao azarão (Ex: +7.5) ou uma desvantagem ao favorito (Ex: -7.5).
-- Over/Under de Pontos (Totais): Aposta no somatório de pontos das duas equipes. É crucial analisar se os times têm estilo "Run and Gun" (ataque rápido) ou se focam na defesa. 
-- Raciocínio Cruzado: Se um time está mal, verifique lesões (get_injuries).
-- Tom de Voz: Profissional, analítico e entusiasta (use termos como "Double-double", "Clutch", "Playoffs race").
-- Data Atual: Considere que estamos em Janeiro de 2026.
-- Formatação: Use tabelas Markdown para comparações.
-- Saída JSON Obrigatória (conforme schema).`;
-
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const config = {
-    tools: [{ functionDeclarations: nbaTools }, { googleSearch: {} }],
-    systemInstruction: MATCHUP_SYSTEM_INSTRUCTION,
-    responseMimeType: "application/json",
-    responseSchema: schema
-  };
+  VOCÊ DEVE RESPONDER EXCLUSIVAMENTE NO SEGUINTE FORMATO JSON:
+  {
+    "winner": "Nome do Time",
+    "confidence": 85,
+    "keyFactor": "Frase curta explicando o principal motivo",
+    "detailedAnalysis": "Texto longo com análise tática",
+    "overUnderAlert": "OVER" | "UNDER",
+    "overUnderTarget": 225.5,
+    "safetyMargin": "Texto explicando a linha segura (ex: 'Entrar em Under 235.5')",
+    "injuryImpact": "Análise detalhada do peso das ausências",
+    "bettingTips": ["Dica 1", "Dica 2"],
+    "defensiveAnalysis": "Como os times defendem hoje"
+  }`;
 
   const prompt = `Analise o confronto tático: ${teamA.name} vs ${teamB.name}.
   Contexto de Lesões (Jogadores Fora): ${injuries.map(p => `${p.player_name || p.nome}`).join(', ') || 'Nenhum relevante'}.
-  Estatísticas Reais (Tabela Oficial Teams):
+  Estatísticas Reais:
   - ${teamA.name}: ${teamA.wins}V - ${teamA.losses}D | Últimos 5: ${teamA.record.join(', ')}
   - ${teamB.name}: ${teamB.wins}V - ${teamB.losses}D | Últimos 5: ${teamB.record.join(', ')}
-  Métricas Adicionais (ESPN):
+  Métricas:
   - ${teamA.name}: Ataque ${teamA.stats?.media_pontos_ataque || 'N/A'}, Defesa ${teamA.stats?.media_pontos_defesa || 'N/A'}. 
   - ${teamB.name}: Ataque ${teamB.stats?.media_pontos_ataque || 'N/A'}, Defesa ${teamB.stats?.media_pontos_defesa || 'N/A'}.`;
 
   try {
-    let response = await ai.models.generateContent({
-      model: "gemini-2.0-flash", // Atualizado para modelo mais rápido e eficiente para JSON
-      contents: prompt,
-      config
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: enhancedSystem },
+        { role: "user", content: prompt }
+      ],
+      tools: nbaTools,
+      response_format: { type: "json_object" }
     });
 
-    const toolResponses = await handleStreamingFunctionCalls(response, prompt, null, config);
-    if (toolResponses) {
-      response = await ai.models.generateContent({
-        model: "gemini-2.0-flash", // Use consistent model
+    let message = response.choices[0].message;
 
-        contents: [
-          { role: 'user', parts: [{ text: prompt }] },
-          { role: 'model', parts: response.candidates[0].content.parts },
-          { role: 'user', parts: toolResponses }
-        ],
-        config
+    if (message.tool_calls) {
+      const toolMessages: any[] = [{ role: "system", content: enhancedSystem }, { role: "user", content: prompt }, message];
+      for (const toolCall of message.tool_calls) {
+        const result = await handleNbaFunctionCall(toolCall.function.name, JSON.parse(toolCall.function.arguments));
+        toolMessages.push({ role: "tool", tool_call_id: toolCall.id, content: JSON.stringify(result) });
+      }
+      const secondResponse = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: toolMessages,
+        response_format: { type: "json_object" }
       });
+      message = secondResponse.choices[0].message;
     }
 
-    if (!response.text) throw new Error("Empty response");
-    const analysis = JSON.parse(cleanJsonOutput(response.text));
-    // Fixed: Corrected the typo where 'sources' was used instead of 'response'
-    analysis.sources = extractSources(response);
+    const analysis = JSON.parse(cleanJsonOutput(message.content || "{}"));
 
-    // Save to Cache
+    // Extract sources from web_search if it was called
+    const searchCall = message.tool_calls ? toolMessages?.find(m => m.role === 'tool' && m.content.includes('results')) : undefined;
+    analysis.sources = searchCall ? JSON.parse(searchCall.content).results : [];
+
     try {
       localStorage.setItem(cacheKey, JSON.stringify(analysis));
-    } catch (e) { console.warn("Failed to cache analysis", e); }
+    } catch (e) { }
 
     return analysis;
   } catch (error: any) {
-    if (error.status === 403) throw new Error("PERMISSION_DENIED");
-
-    // Fallback to Groq only if API Key is configured and it's not a permission error
-    if (process.env.GROQ_API_KEY && (error.status === 429 || error.message?.includes("Quota") || error.message?.includes("429"))) {
+    if (process.env.GROQ_API_KEY) {
       try {
-        const fallbackAnalysis = await callGroqFallback(prompt, MATCHUP_SYSTEM_INSTRUCTION + "\nResponda em JSON.", schema);
-        // Groq doesn't provide sources, so we leave it empty or add a note
-        fallbackAnalysis.sources = [{ title: "Análise via Llama 3 (Groq Fallback)", url: "#" }];
-        return fallbackAnalysis;
-      } catch (groqError) {
-        console.error("Fallback failed:", groqError);
-        throw error; // Throw original Gemini error if fallback fails
+        const fallback = await callGroqFallback(prompt, enhancedSystem, true);
+        fallback.sources = [{ title: "Análise via Llama 3 (Groq Fallback)", url: "#" }];
+        return fallback;
+      } catch (e) {
+        throw error;
       }
     }
-
     throw error;
   }
 };
 
-export const startChatSession = () => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  return ai.chats.create({
-    model: 'gemini-2.0-flash',
-    config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
-      tools: [{ functionDeclarations: nbaTools }, { googleSearch: {} }],
-    }
-  });
-};
-
-export const sendChatMessage = async (chat: Chat, message: string) => {
-  let response = await chat.sendMessage({ message });
-
-  const toolResponses = await handleStreamingFunctionCalls(response, message, chat, {});
-  if (toolResponses) {
-    // Use correct object format for @google/genai chat.sendMessage
-    response = await chat.sendMessage({ message: toolResponses });
-  }
-
-  return {
-    text: response.text,
-    sources: extractSources(response)
-  };
-};

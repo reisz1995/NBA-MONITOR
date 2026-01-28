@@ -56,6 +56,12 @@ export interface MatchupAnalysis {
   confidence: number;
   keyFactor: string;
   detailedAnalysis: string;
+  overUnderAlert?: 'OVER' | 'UNDER';
+  overUnderTarget?: number;
+  safetyMargin?: string;
+  injuryImpact?: string;
+  bettingTips?: string[];
+  defensiveAnalysis?: string;
   sources?: Source[];
 }
 
