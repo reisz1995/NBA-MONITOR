@@ -223,13 +223,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (message.tool_calls) {
             const toolMessages: any[] = [{ role: "system", content: enhancedSystem }, { role: "user", content: prompt }, message];
-            for (const toolCall of message.tool_calls) {
+
+            const toolCalls = message.tool_calls;
+            const toolResults = await Promise.all(toolCalls.map(async (toolCall) => {
                 const tc = toolCall as any;
                 if (tc.function) {
                     const result = await handleNbaFunctionCall(tc.function.name, JSON.parse(tc.function.arguments));
-                    toolMessages.push({ role: "tool", tool_call_id: toolCall.id, content: JSON.stringify(result) });
+                    return { role: "tool", tool_call_id: toolCall.id, content: JSON.stringify(result) };
                 }
-            }
+                return null;
+            }));
+
+            toolMessages.push(...toolResults.filter(r => r !== null));
+
             const secondResponse = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: toolMessages,
@@ -238,9 +244,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             message = secondResponse.choices[0].message;
         }
 
-        return res.status(200).json(JSON.parse(message.content || "{}"));
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ error: 'Internal server error' });
+        const content = message.content || "{}";
+        console.log("LLM Comparison Content:", content);
+        return res.status(200).json(JSON.parse(content));
+    } catch (error: any) {
+        console.error("Comparison API Error:", error.message, error.stack);
+        return res.status(500).json({ error: error.message || 'Internal server error' });
     }
 }

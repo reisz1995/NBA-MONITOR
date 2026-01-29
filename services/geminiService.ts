@@ -17,7 +17,10 @@ export const analyzeStandings = async (teams: Team[]): Promise<Insight[]> => {
       body: JSON.stringify({ teams })
     });
 
-    if (!response.ok) throw new Error("API request failed");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API error (${response.status}): ${errorData.error || response.statusText}`);
+    }
 
     const data = await response.json();
     return data.insights || data;
@@ -43,7 +46,10 @@ export const compareTeams = async (teamA: Team, teamB: Team, playerStats: Player
       body: JSON.stringify({ teamA, teamB, playerStats, injuries })
     });
 
-    if (!response.ok) throw new Error("API request failed");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API error (${response.status}): ${errorData.error || response.statusText}`);
+    }
 
     const analysis = await response.json();
 
