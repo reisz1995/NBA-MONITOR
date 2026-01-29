@@ -216,8 +216,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 { role: "system", content: enhancedSystem },
                 { role: "user", content: prompt }
             ],
-            tools: nbaTools,
-            response_format: { type: "json_object" }
+            tools: nbaTools
         });
 
         let message = response.choices[0].message;
@@ -239,8 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const secondResponse = await openai.chat.completions.create({
                 model: "llama-3.3-70b-versatile",
-                messages: toolMessages,
-                response_format: { type: "json_object" }
+                messages: toolMessages
             });
             message = secondResponse.choices[0].message;
         }

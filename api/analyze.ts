@@ -178,8 +178,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 { role: "system", content: FULL_SYSTEM_INSTRUCTION + "\nResponda obrigatoriamente em JSON no formato: { \"insights\": [ { \"title\": \"...\", \"content\": \"...\", \"type\": \"prediction|analysis|warning\" } ] }" },
                 { role: "user", content: "Gere insights sobre a classificação atual e desfalques na NBA." }
             ],
-            tools: nbaTools,
-            response_format: { type: "json_object" }
+            tools: nbaTools
         });
 
         let message = response.choices[0].message;
@@ -209,8 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const secondResponse = await openai.chat.completions.create({
                 model: "llama-3.3-70b-versatile",
-                messages: toolMessages,
-                response_format: { type: "json_object" }
+                messages: toolMessages
             });
             message = secondResponse.choices[0].message;
         }
