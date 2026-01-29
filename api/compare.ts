@@ -4,7 +4,8 @@ import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: "https://api.groq.com/openai/v1",
 });
 
 const supabase = createClient(
@@ -210,7 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-4o",
+            model: "llama-3.3-70b-versatile",
             messages: [
                 { role: "system", content: enhancedSystem },
                 { role: "user", content: prompt }
@@ -237,7 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             toolMessages.push(...toolResults.filter(r => r !== null));
 
             const secondResponse = await openai.chat.completions.create({
-                model: "gpt-4o",
+                model: "llama-3.3-70b-versatile",
                 messages: toolMessages,
                 response_format: { type: "json_object" }
             });
