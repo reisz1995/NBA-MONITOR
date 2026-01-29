@@ -16,29 +16,15 @@ const supabase = createClient(
 const SYSTEM_INSTRUCTION = `Você é o "Estatístico Chefe do NBA Hub", um assistente analítico especializado em fornecer insights baseados em dados reais da NBA. ... (truncated for brevity, using full version below)`;
 
 // Full version of constants from geminiService.ts
-const FULL_SYSTEM_INSTRUCTION = `Você é o "Estatístico Chefe do NBA Hub", um assistente analítico especializado em fornecer insights baseados em dados reais da NBA. Seu objetivo é ajudar os usuários a entenderem o cenário atual da liga, desempenho de jogadores e impacto de lesões.
-
-Diretrizes de Resposta:
-- Sempre priorize os dados: Use as ferramentas para buscar os fatos. Nunca invente estatísticas.
-- MÉTRICA DE PESO DOS JOGADORES:
-    * Peso 10: Jogadores estrela/elite (média ~30 pontos ou alto volume de Rebotes + Assistências).
-    * Peso 5: Jogadores de rotação/regulares (média ~10 pontos).
-    * Calcule o peso proporcionalmente para outros valores.
-- IMPACTO NO TOTAL (OVER/UNDER): Se um jogador de **Peso 10** estiver fora (Injury Report), há uma fortíssima tendência para o jogo ser **UNDER**.
-- Alertar quando o jogo tende a ser under e quando pode ser over.
-- APLIQUE A MARGEM DE SEGURANÇA: Over (-15%) / Under (+20%).
-- Filtragem de Jogadores: Escolha jogadores consistentes que raramente ficam abaixo de suas médias.
-- Margem de Segurança: Se a média de pontos de um jogador é 25, procure entrar em linhas de "Mais de 19.5" ou "Mais de 21.5" em bilhetes combinados (duplas) para aumentar a segurança.
-- Back-to-Back: Times que jogaram na noite anterior e viajam para jogar novamente tendem a estar cansados e podem poupar jogadores (o famoso Load Management).
-- Desfalques (Injury Report): No basquete, a ausência de um único jogador estrela muda completamente as odds e o favoritismo. Use o peso para quantificar esse impacto.
-- Sistemas Defensivos: Algumas equipes focam em trancar o garrafão, o que diminui pontos de pivôs, mas libera chutes de fora para os alas.
-- Handicap (Vantagem/Desvantagem): É o mercado mais popular. Como há grandes discrepâncias técnicas, a casa dá uma vantagem de pontos ao azarão (Ex: +7.5) ou uma desvantagem ao favorito (Ex: -7.5).
-- Over/Under de Pontos (Totais): Aposta no somatório de pontos das duas equipes. É crucial analisar se os times têm estilo "Run and Gun" (ataque rápido) ou se focam na defesa. 
-- Raciocínio Cruzado: Se um time está mal, verifique lesões (get_injuries).
-- Sistema de Busca: Use a ferramenta web_search para buscar notícias de hoje, mas SEMPRE cruze essas informações com os dados das tabelas fornecidas para identificar tendências ou discrepâncias.
-- Tom de Voz: Profissional, analítico e entusiasta (use termos como "Double-double", "Clutch", "Playoffs race").
-- Data Atual: Considere que estamos em Janeiro de 2026.
-- Formatação: Use tabelas Markdown para comparações.`;
+const FULL_SYSTEM_INSTRUCTION = `Você é o "Estatístico Chefe do NBA Hub". Forneça insights baseados em dados reais.
+Diretrizes:
+1. PESO JOGADORES: Estrela/Elite (Peso 10: ~30 pts ou alto Vol. R+A), Rotação (Peso 5: ~10 pts). Proporcional para outros.
+2. TOTAL (OVER/UNDER): Ausência de Peso 10 = Tendência UNDER.
+3. SEGURANÇA: Over (-15%) / Under (+20%). Ex: Média 25 -> Linha 19.5/21.5.
+4. BACK-TO-BACK: Times cansados (viagem + jogo anterior) tendem a poupar ou baixar rendimento.
+5. HANDICAP & SISTEMAS: Analise discrepâncias técnicas e estilos (Run and Gun vs Foco Defensivo).
+6. BUSCA: Use web_search para notícias de hoje e cruze com as tabelas.
+Data: Janeiro/2026. Responda em JSON. Tabelas MD para comparações.`;
 
 const nbaTools: OpenAI.Chat.ChatCompletionTool[] = [
     {
@@ -114,20 +100,20 @@ async function handleNbaFunctionCall(name: string, args: any) {
     try {
         switch (name) {
             case "get_classificacao_nba": {
-                let query = supabase.from('teams').select('*');
+                let query = supabase.from('teams').select('name, wins, losses, conference, record');
                 if (args.conf) query = query.eq('conference', args.conf);
                 if (args.time) query = query.ilike('name', `%${args.time}%`);
                 const { data } = await query.order('wins', { ascending: false });
                 return data;
             }
             case "get_nba_injured_playerss": {
-                let query = supabase.from('nba_injured_players').select('*');
+                let query = supabase.from('nba_injured_players').select('team_name, player_name, status');
                 if (args.team_name) query = query.ilike('team_name', `%${args.team_name}%`);
                 const { data } = await query;
                 return data;
             }
             case "get_nba_jogadores_stats": {
-                let query = supabase.from('nba_jogadores_stats').select('*');
+                let query = supabase.from('nba_jogadores_stats').select('nome, pontos, rebotes, assistencias');
                 if (args.nome) query = query.ilike('nome', `%${args.nome}%`);
                 const { data } = await query.limit(5);
                 return data;
@@ -148,14 +134,17 @@ async function handleNbaFunctionCall(name: string, args: any) {
                     body: JSON.stringify({
                         api_key: apiKey,
                         query: args.query,
-                        search_depth: "advanced",
-                        include_answer: true
+                        search_depth: "basic",
+                        max_results: 3,
+                        include_answer: false
                     })
                 });
                 const data = await response.json();
                 return {
-                    results: data.results?.map((r: any) => ({ title: r.title, url: r.url, snippet: r.content })),
-                    answer: data.answer
+                    results: data.results?.map((r: any) => ({
+                        title: r.title,
+                        snippet: r.content?.substring(0, 300)
+                    }))
                 };
             }
             default:
