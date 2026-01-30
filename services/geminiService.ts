@@ -1,72 +1,78 @@
-
 import { Team, Insight, MatchupAnalysis, PlayerStat } from "../types";
+import { supabase } from "../lib/supabase";
 
-const cleanJsonOutput = (text: string): string => {
-  if (!text) return "[]";
-  let clean = text.trim();
-  clean = clean.replace(/^```json\s*/i, "").replace(/^```\s*/i, "");
-  clean = clean.replace(/\s*```$/, "");
-  return clean;
-};
+const parsePrediction = (predictionStr: string): Partial<MatchupAnalysis> => {
+  if (!predictionStr) return {};
 
-export const analyzeStandings = async (teams: Team[]): Promise<Insight[]> => {
-  try {
-    const response = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teams })
-    });
+  const parts = predictionStr.split('|').map(p => p.trim());
+  const result: Partial<MatchupAnalysis> = {
+    keyFactor: "Análise do Banco de Dados",
+    detailedAnalysis: predictionStr
+  };
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API error (${response.status}): ${errorData.error || response.statusText}`);
+  parts.forEach(part => {
+    if (part.startsWith('Palpite:')) {
+      result.winner = part.replace('Palpite:', '').trim();
+    } else if (part.startsWith('Confiança:')) {
+      const conf = part.replace('Confiança:', '').trim().toLowerCase();
+      if (conf.includes('alta')) result.confidence = 90;
+      else if (conf.includes('média') || conf.includes('media')) result.confidence = 70;
+      else result.confidence = 50;
+    } else if (part.startsWith('Análise:')) {
+      result.detailedAnalysis = part.replace('Análise:', '').trim();
     }
+  });
 
-    const data = await response.json();
-    return data.insights || data;
-  } catch (error) {
-    console.error("Analysis Error:", error);
-    return [];
-  }
+  return result;
 };
 
 export const compareTeams = async (teamA: Team, teamB: Team, playerStats: PlayerStat[], injuries: any[] = []): Promise<MatchupAnalysis> => {
   const today = new Date().toISOString().split('T')[0];
-  const cacheKey = `analysis_v2_${teamA.id}_${teamB.id}_${today}`;
 
   try {
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) return JSON.parse(cached);
-  } catch (e) { }
+    const { data, error } = await supabase
+      .from('game_predictions')
+      .select('*')
+      .or(`and(home_team.ilike.%${teamA.name}%,away_team.ilike.%${teamB.name}%),and(home_team.ilike.%${teamB.name}%,away_team.ilike.%${teamA.name}%)`)
+      .eq('date', today)
+      .maybeSingle();
 
-  try {
-    const response = await fetch("/api/compare", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamA, teamB, playerStats, injuries })
-    });
+    if (error) throw error;
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API error (${response.status}): ${errorData.error || response.statusText}`);
+    if (!data) {
+      return {
+        winner: "Indisponível",
+        confidence: 0,
+        keyFactor: "Sem dados para hoje",
+        detailedAnalysis: "Não encontramos previsões para este confronto no banco de dados para a data de hoje.",
+        bettingTips: []
+      };
     }
 
-    const analysis = await response.json();
+    const parsed = parsePrediction(data.prediction);
 
-    try {
-      localStorage.setItem(cacheKey, JSON.stringify(analysis));
-    } catch (e) { }
-
-    return analysis;
+    return {
+      winner: parsed.winner || "Análise Pendente",
+      confidence: parsed.confidence || data.win_probability || 70,
+      keyFactor: parsed.keyFactor || "Análise do Banco de Dados",
+      detailedAnalysis: parsed.detailedAnalysis || "Análise detalhada não disponível.",
+      bettingTips: [],
+      sources: []
+    };
   } catch (error: any) {
-    console.error("Comparison Error:", error);
-    throw error;
+    console.error("Supabase Comparison Error:", error);
+    return {
+      winner: "Erro na Busca",
+      confidence: 0,
+      keyFactor: "Erro de Conexão",
+      detailedAnalysis: "Não foi possível recuperar os dados do Supabase.",
+    };
   }
 };
 
-// Fallback logic is now handled server-side if implemented there.
-export async function callGroqFallback(prompt: string, systemInstruction: string, schema?: any): Promise<any> {
-  console.warn("Groq fallback should be called from the server-side API.");
-  return { error: "Client-side fallback disabled for security" };
-}
+// analyzeStandings remains for other parts of the app if needed, 
+// but we could also migrate it to Supabase if requested.
+export const analyzeStandings = async (teams: Team[]): Promise<Insight[]> => {
+  return []; // Desativado conforme solicitação de não precisar mais das APIs
+};
 

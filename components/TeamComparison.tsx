@@ -52,7 +52,6 @@ const StatBar: React.FC<StatBarProps> = ({ label, valA, valB, inverse = false, i
 const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerStats, unavailablePlayers, onClose }) => {
   const [analysis, setAnalysis] = useState<MatchupAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
-  const [permissionError, setPermissionError] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Helper para deduplicar jogadores
@@ -87,30 +86,13 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
   useEffect(() => {
     const fetchAnalysis = async () => {
       setLoading(true);
-      setPermissionError(false);
       setError(null);
       try {
         const result = await compareTeams(teamA, teamB, playerStats, [...injuriesA, ...injuriesB]);
         setAnalysis(result);
       } catch (e: any) {
         console.error("Analysis Error:", e);
-        if (e.message === "PERMISSION_DENIED") {
-          setPermissionError(true);
-        } else {
-          let errorMsg = e.message || "Erro desconhecido na análise";
-          try {
-            // Tenta fazer parse se a mensagem for um JSON de erro da API
-            if (typeof errorMsg === 'string' && errorMsg.includes('{')) {
-              const cleanJson = errorMsg.substring(errorMsg.indexOf('{'));
-              const parsed = JSON.parse(cleanJson);
-              if (parsed.error && parsed.error.message) {
-                errorMsg = parsed.error.message;
-              }
-            }
-          } catch (err) { /* ignore parse error */ }
-
-          setError(errorMsg);
-        }
+        setError(e.message || "Erro ao carregar previsão do banco de dados");
       } finally {
         setLoading(false);
       }
@@ -120,28 +102,10 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
 
   const getInjuryColor = (p: any) => {
     const status = (p.status || p.injury_status || p.motivo || '').toLowerCase();
-    // Logic from UnavailablePlayers: 'leve' = yellow, 'grave' = red
     if (status.includes('leve') || status.includes('day') || status.includes('questionable') || status.includes('doubtful')) {
       return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
     }
     return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
-  };
-
-  const handleAuth = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setLoading(true);
-      setError(null);
-      try {
-        const result = await compareTeams(teamA, teamB, playerStats, [...injuriesA, ...injuriesB]);
-        setAnalysis(result);
-        setPermissionError(false);
-      } catch (e: any) {
-        console.error(e);
-        setError(e.message || "Erro após autenticação");
-      }
-      finally { setLoading(false); }
-    }
   };
 
   const getMetric = (team: Team, key: 'media_pontos_ataque' | 'media_pontos_defesa' | 'aproveitamento') => {
@@ -167,7 +131,7 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
         <div className="px-6 py-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur-md">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
-            <h2 className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-[0.4em]">Análise de Elite 2026</h2>
+            <h2 className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-[0.4em]">Análise de Banco de Dados 2026</h2>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-all active:scale-90">
             <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -219,7 +183,6 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
                   />
                   <StatBar label="V. Temporada" valA={teamA.wins} valB={teamB.wins} />
 
-                  {/* Nova Linha: Pontos Combinados */}
                   <div className="mt-8 pt-4 border-t border-slate-800/50">
                     <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-3 rounded-xl border border-indigo-500/10 flex justify-between items-center">
                       <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Projetado (PPG Combinado)</span>
@@ -295,8 +258,8 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
             <div className="lg:col-span-8 bg-gradient-to-br from-indigo-500/10 via-slate-900 to-slate-900 border border-indigo-500/20 rounded-3xl p-6 lg:p-10 flex flex-col shadow-inner">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex flex-col">
-                  <h4 className="text-indigo-400 font-black text-[11px] uppercase tracking-widest">IA Projeção 2026</h4>
-                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">Baseado em Dados ESPN + Tavily Pro Search + Desfalques</span>
+                  <h4 className="text-indigo-400 font-black text-[11px] uppercase tracking-widest">Predição do Sistema 2026</h4>
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">Sincronizado com a tabela game_predictions do Supabase</span>
                 </div>
                 {analysis && (
                   <div className="bg-indigo-600 px-4 py-2 rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.3)]">
@@ -309,32 +272,21 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
                 <div className="flex-1 flex flex-col justify-center items-center space-y-6">
                   <div className="relative">
                     <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
-                    <div className="absolute inset-0 flex items-center justify-center font-black text-indigo-500 text-[10px]">IA</div>
+                    <div className="absolute inset-0 flex items-center justify-center font-black text-indigo-500 text-[10px]">DB</div>
                   </div>
                   <div className="text-center space-y-2">
-                    <p className="text-xs font-black text-white uppercase tracking-widest animate-pulse">Cruzando Métricas e Desfalques...</p>
+                    <p className="text-xs font-black text-white uppercase tracking-widest animate-pulse">Consultando Banco de Dados...</p>
                   </div>
-                </div>
-              ) : permissionError ? (
-                <div className="flex-1 flex flex-col justify-center items-center text-center space-y-6 p-10">
-                  <button onClick={handleAuth} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black px-8 py-4 rounded-full uppercase tracking-widest transition-all shadow-2xl active:scale-95">🔑 Ativar Análise Pro</button>
-                  {error && <p className="text-rose-400 text-[10px] font-mono mt-4">{error}</p>}
                 </div>
               ) : error ? (
                 <div className="flex-1 flex flex-col justify-center items-center text-center space-y-4 p-10">
-                  <div className="text-rose-500 font-black text-xl mb-2">Erro na Análise</div>
+                  <div className="text-rose-500 font-black text-xl mb-2">Erro na Busca</div>
                   <p className="text-slate-400 text-xs">{error}</p>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="mt-4 px-4 py-2 bg-slate-800 text-slate-300 text-[10px] uppercase font-bold rounded-lg hover:bg-slate-700"
-                  >
-                    Tentar Novamente
-                  </button>
                 </div>
               ) : analysis ? (
                 <div className="space-y-8 flex-1 flex flex-col">
                   <div className="flex flex-col md:flex-row md:items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <span className="text-emerald-400 font-black text-sm uppercase italic tracking-tighter shrink-0">Vencedor Projetado:</span>
+                    <span className="text-emerald-400 font-black text-sm uppercase italic tracking-tighter shrink-0">Palpite Projetado:</span>
                     <span className="text-white font-black text-2xl md:text-3xl underline decoration-indigo-500 decoration-4 underline-offset-8 uppercase italic animate-pulse">{analysis.winner}</span>
 
                     {analysis.overUnderAlert && (
@@ -349,7 +301,7 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
                     <div className="p-5 bg-black/40 rounded-2xl border border-white/5 relative overflow-hidden group">
                       <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Linha de Segurança:</p>
-                      <p className="text-emerald-400 text-sm md:text-base font-bold leading-relaxed">{analysis.safetyMargin || 'Análise indisponível'}</p>
+                      <p className="text-emerald-400 text-sm md:text-base font-bold leading-relaxed">{analysis.safetyMargin || 'Conforme análise do banco'}</p>
                     </div>
                     <div className="p-5 bg-black/40 rounded-2xl border border-white/5 relative overflow-hidden group">
                       <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
@@ -362,7 +314,7 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
                     <div className="p-5 bg-slate-800/30 rounded-2xl border border-white/5">
                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
-                        Dicas do Estatístico:
+                        Dicas do Sistema:
                       </p>
                       <ul className="space-y-2">
                         {analysis.bettingTips.map((tip, i) => (
@@ -376,39 +328,12 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
 
                   <div className="flex-1 space-y-4">
                     <div className="space-y-2">
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Análise Estratégica:</p>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Análise Detalhada:</p>
                       <p className="text-slate-400 text-xs md:text-sm leading-relaxed font-medium">
                         {analysis.detailedAnalysis}
                       </p>
                     </div>
-
-                    {analysis.injuryImpact && (
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-black text-rose-500/70 uppercase tracking-widest">Impacto dos Desfalques:</p>
-                        <p className="text-slate-400 text-xs md:text-sm leading-relaxed italic">
-                          {analysis.injuryImpact}
-                        </p>
-                      </div>
-                    )}
                   </div>
-
-                  {analysis.sources && analysis.sources.length > 0 && (
-                    <div className="mt-auto pt-8 border-t border-slate-800">
-                      <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-4">Evidências (2026)</p>
-                      <div className="flex flex-wrap gap-2">
-                        {analysis.sources.map((s, i) => (
-                          <a
-                            key={i}
-                            href={s.url}
-                            target="_blank"
-                            className="text-[10px] bg-slate-800/50 text-slate-500 hover:text-indigo-400 border border-white/5 px-4 py-2 rounded-xl transition-all"
-                          >
-                            {s.title}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               ) : null}
             </div>

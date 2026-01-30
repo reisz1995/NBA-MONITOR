@@ -4,7 +4,6 @@ import useSWR from 'swr';
 import { INITIAL_TEAMS, INITIAL_ESPN_DATA } from './constants';
 import { Team, GameResult, Insight, PlayerStat, ESPNData } from './types';
 import StandingsTable from './components/StandingsTable';
-import AnalysisPanel from './components/AnalysisPanel';
 import TeamComparison from './components/TeamComparison';
 import ESPNTable from './components/ESPNTable';
 import Scoreboard from './components/Scoreboard';
@@ -33,8 +32,6 @@ const App: React.FC = () => {
     return data || [];
   }, { revalidateOnFocus: false });
 
-  const [insights, setInsights] = useState<Insight[]>([]);
-  const [loadingInsights, setLoadingInsights] = useState(false);
   const [selectedTeamIds, setSelectedTeamIds] = useState<number[]>([]);
 
   const getMomentumScore = (record: GameResult[]) => {
@@ -321,17 +318,11 @@ const App: React.FC = () => {
               onRefresh={() => mutateUnavailable()}
             />
 
-            <AnalysisPanel
-              insights={insights}
-              loading={loadingInsights}
-              onRefresh={async () => {
-                setLoadingInsights(true);
-                try {
-                  const results = await analyzeStandings(sortedTeams);
-                  setInsights(results);
-                } catch (e) { console.error(e); }
-                setLoadingInsights(false);
-              }}
+            <UnavailablePlayers
+              players={unavailablePlayers}
+              loading={loadingUnavailable}
+              teams={mergedTeams}
+              onRefresh={() => mutateUnavailable()}
             />
           </aside>
         </div>
