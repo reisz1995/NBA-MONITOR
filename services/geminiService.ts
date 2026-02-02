@@ -5,7 +5,13 @@ import { Team, MatchupAnalysis, PlayerStat } from "../types";
 import { supabase } from "../lib/supabase";
 
 export const compareTeams = async (teamA: Team, teamB: Team, playerStats: PlayerStat[], injuries: any[] = []): Promise<MatchupAnalysis> => {
-  const today = new Date().toISOString().split('T')[0];
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const today = `${year}-${month}-${day}`;
+
+  console.log("Fetching predictions for:", { today, teamA: teamA.name, teamB: teamB.name });
 
   try {
     const { data, error } = await supabase
