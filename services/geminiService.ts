@@ -1,30 +1,8 @@
 import { Team, Insight, MatchupAnalysis, PlayerStat } from "../types";
 import { supabase } from "../lib/supabase";
 
-const parsePrediction = (predictionStr: string): Partial<MatchupAnalysis> => {
-  if (!predictionStr) return {};
-
-  const parts = predictionStr.split('|').map(p => p.trim());
-  const result: Partial<MatchupAnalysis> = {
-    keyFactor: "Análise do Banco de Dados",
-    detailedAnalysis: predictionStr
-  };
-
-  parts.forEach(part => {
-    if (part.startsWith('Palpite:')) {
-      result.winner = part.replace('Palpite:', '').trim();
-    } else if (part.startsWith('Confiança:')) {
-      const conf = part.replace('Confiança:', '').trim().toLowerCase();
-      if (conf.includes('alta')) result.confidence = 90;
-      else if (conf.includes('média') || conf.includes('media')) result.confidence = 70;
-      else result.confidence = 50;
-    } else if (part.startsWith('Análise:')) {
-      result.detailedAnalysis = part.replace('Análise:', '').trim();
-    }
-  });
-
-  return result;
-};
+import { Team, MatchupAnalysis, PlayerStat } from "../types";
+import { supabase } from "../lib/supabase";
 
 export const compareTeams = async (teamA: Team, teamB: Team, playerStats: PlayerStat[], injuries: any[] = []): Promise<MatchupAnalysis> => {
   const today = new Date().toISOString().split('T')[0];
@@ -49,15 +27,27 @@ export const compareTeams = async (teamA: Team, teamB: Team, playerStats: Player
       };
     }
 
-    const parsed = parsePrediction(data.prediction);
+    const jsonPred = typeof data.prediction === 'string' ? JSON.parse(data.prediction) : (data.prediction || {});
+
+    const parseConfidence = (conf: string): number => {
+      if (!conf) return 70;
+      const c = conf.toLowerCase();
+      if (c.includes('alta')) return 90;
+      if (c.includes('média') || c.includes('media')) return 75;
+      if (c.includes('baixa')) return 50;
+      return 70;
+    };
 
     return {
-      winner: parsed.winner || "Análise Pendente",
-      confidence: parsed.confidence || data.win_probability || 70,
-      keyFactor: parsed.keyFactor || "Análise do Banco de Dados",
-      detailedAnalysis: parsed.detailedAnalysis || "Análise detalhada não disponível.",
-      bettingTips: [],
-      sources: []
+      winner: data.main_pick || jsonPred.palpite_principal || "Análise Pendente",
+      confidence: parseConfidence(data.confidence || jsonPred.confianca),
+      keyFactor: jsonPred.fator_decisivo || "Análise do Banco de Dados",
+      detailedAnalysis: jsonPred.analise_curta || "Análise detalhada não disponível.",
+      bettingTips: [
+        data.over_line || jsonPred.linha_seguranca_over,
+        data.under_line || jsonPred.linha_seguranca_under
+      ].filter(Boolean),
+      sources: data.sources || []
     };
   } catch (error: any) {
     console.error("Supabase Comparison Error:", error);
@@ -68,11 +58,5 @@ export const compareTeams = async (teamA: Team, teamB: Team, playerStats: Player
       detailedAnalysis: "Não foi possível recuperar os dados do Supabase.",
     };
   }
-};
-
-// analyzeStandings remains for other parts of the app if needed, 
-// but we could also migrate it to Supabase if requested.
-export const analyzeStandings = async (teams: Team[]): Promise<Insight[]> => {
-  return []; // Desativado conforme solicitação de não precisar mais das APIs
 };
 

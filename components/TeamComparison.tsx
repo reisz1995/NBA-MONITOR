@@ -116,13 +116,13 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
     return getMetric(teamA, 'media_pontos_ataque') + getMetric(teamB, 'media_pontos_ataque');
   }, [teamA, teamB]);
 
-  const checkIsInjured = (playerName: string, injuries: any[]) => {
-    if (!playerName) return false;
+  const getInjuryData = (playerName: string, injuries: any[]) => {
+    if (!playerName) return null;
     const cleanPlayer = playerName.toLowerCase().trim();
-    return injuries.some(inj => {
+    return injuries.find(inj => {
       const cleanInj = (inj.player_name || inj.nome || '').toLowerCase().trim();
       return cleanInj === cleanPlayer || (cleanInj.length > 4 && cleanPlayer.includes(cleanInj)) || (cleanPlayer.length > 4 && cleanInj.includes(cleanPlayer));
-    });
+    }) || null;
   };
 
   return (
@@ -227,12 +227,18 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     {playerStats.filter(p => (p.time || '').toLowerCase().includes(teamA.name.toLowerCase())).slice(0, 4).map(p => {
-                      const isInjured = checkIsInjured(p.nome, injuriesA);
+                      const injury = getInjuryData(p.nome, injuriesA);
+                      let colorClass = 'text-slate-400 bg-slate-800/50 border-white/5';
+
+                      if (injury) {
+                        const isD2D = getInjuryColor(injury).includes('yellow');
+                        colorClass = isD2D
+                          ? 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30 font-bold shadow-[0_0_10px_rgba(234,179,8,0.1)]'
+                          : 'text-rose-400 bg-rose-900/20 border-rose-500/30 font-bold shadow-[0_0_10px_rgba(244,63,94,0.1)]';
+                      }
+
                       return (
-                        <div key={p.id} className={`text-[10px] p-2 rounded-lg truncate border transition-colors ${isInjured
-                          ? 'text-rose-400 bg-rose-900/20 border-rose-500/30 font-bold shadow-[0_0_10px_rgba(244,63,94,0.1)]'
-                          : 'text-slate-400 bg-slate-800/50 border-white/5'
-                          }`}>
+                        <div key={p.id} className={`text-[10px] p-2 rounded-lg truncate border transition-colors ${colorClass}`}>
                           {p.nome}
                         </div>
                       );
@@ -240,12 +246,18 @@ const TeamComparison: React.FC<TeamComparisonProps> = ({ teamA, teamB, playerSta
                   </div>
                   <div className="space-y-2">
                     {playerStats.filter(p => (p.time || '').toLowerCase().includes(teamB.name.toLowerCase())).slice(0, 4).map(p => {
-                      const isInjured = checkIsInjured(p.nome, injuriesB);
+                      const injury = getInjuryData(p.nome, injuriesB);
+                      let colorClass = 'text-slate-400 bg-slate-800/50 border-white/5';
+
+                      if (injury) {
+                        const isD2D = getInjuryColor(injury).includes('yellow');
+                        colorClass = isD2D
+                          ? 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30 font-bold shadow-[0_0_10px_rgba(234,179,8,0.1)]'
+                          : 'text-rose-400 bg-rose-900/20 border-rose-500/30 font-bold shadow-[0_0_10px_rgba(244,63,94,0.1)]';
+                      }
+
                       return (
-                        <div key={p.id} className={`text-[10px] p-2 rounded-lg truncate text-right border transition-colors ${isInjured
-                          ? 'text-rose-400 bg-rose-900/20 border-rose-500/30 font-bold shadow-[0_0_10px_rgba(244,63,94,0.1)]'
-                          : 'text-slate-400 bg-slate-800/50 border-white/5'
-                          }`}>
+                        <div key={p.id} className={`text-[10px] p-2 rounded-lg truncate text-right border transition-colors ${colorClass}`}>
                           {p.nome}
                         </div>
                       );
