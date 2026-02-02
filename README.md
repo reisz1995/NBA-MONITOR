@@ -16,10 +16,11 @@ O fluxo de trabalho da plataforma é otimizado para a **Comparação de Times**,
 ## 🎯 Principais Funcionalidades
 
 - **🤖 Análise com Google Gemini AI:** Integração com modelos de IA de última geração para interpretar classificações e prever o momentum das equipes.
+- **✨ Design Premium (Glassmorphism):** Interface sofisticada com efeitos de transparência, desfoque de fundo e animações fluídas.
+- **📱 Otimização Mobile Pro:** Tabelas compactas e layout adaptável para uma experiência de uso rápida e eficiente em smartphones.
 - **⚖️ Sistema de Comparação Avançada:** O núcleo da aplicação, onde os usuários podem comparar métricas chave entre dois times selecionados.
-- **🚑 Monitoramento de Lesões (The Betting Edge):** Acompanhamento detalhado de jogadores indisponíveis, essencial para analistas de bets calcularem o impacto real em cada confronto.
+- **🚑 Relatório Médico (The Betting Edge):** Acompanhamento detalhado de jogadores indisponíveis, essencial para analistas de bets calcularem o impacto real em cada confronto.
 - **📊 Dados em Tempo Real:** Sincronização de estatísticas, classificações e recordes (L10, Streak) através de uma interface reativa.
-- **💬 ChatBot Integrado:** Assistente de IA para consultas rápidas sobre estatísticas e tendências da liga.
 
 ## 🛠️ Stack Tecnológica
 

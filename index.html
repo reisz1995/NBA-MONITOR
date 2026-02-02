@@ -19,16 +19,57 @@
       height: 6px; /* Altura para scroll horizontal */
     }
     .custom-scrollbar::-webkit-scrollbar-track {
-      background: #0f172a;
+      background: transparent;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #334155;
-      border-radius: 4px;
+      background: rgba(249, 115, 22, 0.2);
+      border-radius: 20px;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: #475569;
+      background: rgba(249, 115, 22, 0.4);
     }
     
+    /* Glassmorphism utility */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    .glass-card {
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Animations */
+    @keyframes slideUpFade {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .animate-slide-up {
+      animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .animate-fade-in {
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+
     /* Container utilitário para tabelas responsivas */
     .table-container {
       width: 100%;

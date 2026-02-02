@@ -70,28 +70,25 @@ const UnavailablePlayers: React.FC<UnavailablePlayersProps> = ({ players, loadin
   };
 
   return (
-    <div className="bg-[#0b0e14]/80 border border-slate-800/60 rounded-2xl overflow-hidden shadow-2xl flex flex-col backdrop-blur-2xl">
-      <div className="p-4 md:p-5 border-b border-slate-800/50 flex items-center justify-between shrink-0 gap-2">
+    <div className="glass-panel border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+      <div className="p-4 md:p-5 border-b border-white/5 flex items-center justify-between shrink-0 gap-2">
         <div>
           <h2 className="text-[10px] font-black text-rose-500 uppercase tracking-[0.4em] flex items-center gap-2">
             <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span>
-            Fora do Jogo
+            Relatório Médico
           </h2>
-          <p className="text-[9px] text-slate-500 font-bold uppercase mt-1 tracking-tighter">Relatório de Desfalques 2026</p>
+          <p className="text-[9px] text-slate-500 font-bold uppercase mt-1 tracking-tighter">Desfalques 2026</p>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="relative group">
             <input
               type="text"
-              placeholder="Pesquisar..."
+              placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-slate-950/50 border border-slate-700 text-[10px] text-white px-3 py-1.5 rounded-lg w-28 focus:w-36 md:w-32 md:focus:w-40 transition-all focus:outline-none focus:border-rose-500 placeholder:text-slate-600 font-medium"
+              className="bg-slate-950/50 border border-slate-700 text-[10px] text-white px-3 py-1.5 rounded-lg w-24 focus:w-32 md:w-28 md:focus:w-36 transition-all focus:outline-none focus:border-rose-500 placeholder:text-slate-600 font-medium"
             />
-            <svg className="w-3 h-3 text-slate-600 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none group-focus-within:text-rose-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
           </div>
 
           <button onClick={onRefresh} className="text-slate-500 hover:text-rose-400 transition-all">
@@ -102,35 +99,34 @@ const UnavailablePlayers: React.FC<UnavailablePlayersProps> = ({ players, loadin
         </div>
       </div>
 
-      {/* Conteúdo com altura fixa e scroll */}
-      <div className="overflow-auto custom-scrollbar max-h-[450px] bg-slate-950/20">
+      <div className="overflow-auto custom-scrollbar max-h-[400px]">
         {filteredPlayers.length === 0 ? (
-          <div className="py-20 text-center flex flex-col items-center">
+          <div className="py-16 text-center flex flex-col items-center">
             <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-4">
-              {uniquePlayers.length === 0 ? "Sem registros" : "Nenhum resultado"}
+              Sem desfalques ativos
             </span>
-            {uniquePlayers.length === 0 && (
-              <button onClick={seedUnavailable} className="text-[9px] font-black text-rose-500 border border-rose-500/20 px-4 py-2 rounded-full uppercase hover:bg-rose-500/10">Simular</button>
-            )}
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/40">
+          <div className="divide-y divide-white/5">
             {filteredPlayers.map((p, idx) => {
               const d = getPlayerData(p);
               return (
-                <div key={p.id || idx} className="p-4 flex items-center gap-4 hover:bg-rose-500/[0.03] transition-colors group">
-                  <img src={getTeamLogo(d.time)} className="w-8 h-8 object-contain shrink-0" alt="" />
+                <div key={p.id || idx} className="p-4 flex items-center gap-3.5 hover:bg-rose-500/[0.03] transition-colors group">
+                  <div className="relative shrink-0">
+                    <div className="absolute inset-0 bg-white/5 rounded-full blur-xs opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <img src={getTeamLogo(d.time)} className="w-7 h-7 object-contain relative z-10 opacity-70 group-hover:opacity-100 transition-opacity" alt="" />
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <h3 className="text-xs font-black text-slate-100 truncate">{d.nome}</h3>
-                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md border uppercase shrink-0 ${(d.gravidade.includes('out') || d.gravidade.includes('grave'))
-                          ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
-                          : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <h3 className="text-[11px] font-bold text-slate-100 truncate tracking-tight">{d.nome}</h3>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase shrink-0 ${(d.gravidade.includes('out') || d.gravidade.includes('grave'))
+                        ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                        : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
                         }`}>{d.gravidade}</span>
                     </div>
-                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
-                      <span className="truncate max-w-[120px]">{d.motivo}</span>
-                      <span className="text-[9px] font-black uppercase text-slate-400">{d.retorno}</span>
+                    <div className="flex items-center justify-between text-[10px] font-bold">
+                      <span className="text-slate-500 truncate max-w-[110px] tracking-tight">{d.motivo}</span>
+                      <span className="text-[8px] font-black uppercase text-slate-400/70">{d.retorno}</span>
                     </div>
                   </div>
                 </div>

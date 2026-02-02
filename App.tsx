@@ -76,34 +76,38 @@ const App: React.FC = () => {
         onClearSelection={() => setSelectedTeamIds([])}
       />
 
-      <main className="max-w-7xl mx-auto p-4 md:p-8 flex-1 w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-3 space-y-6">
-            <div className="px-2">
-              <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter italic uppercase border-l-4 border-orange-500 pl-4">
-                Power Ranking 2026
-              </h2>
-              <p className="text-slate-500 text-sm mt-2 pl-5">
-                Ordenado por: <span className="text-orange-400 font-bold underline decoration-2 underline-offset-4">Momento Recente</span> seguido de Vitórias Totais.
-              </p>
+      <main className="max-w-7xl mx-auto p-4 md:p-8 flex-1 w-full animate-slide-up">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
+          <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+            <div className="px-2 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+              <div>
+                <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter italic uppercase border-l-4 border-orange-500 pl-4">
+                  Power Ranking <span className="text-orange-500">2026</span>
+                </h2>
+                <p className="text-slate-500 text-[10px] md:text-xs mt-2 pl-5 uppercase font-black tracking-widest">
+                  Filtro: <span className="text-orange-400 underline decoration-2 underline-offset-4">Performance Recente</span>
+                </p>
+              </div>
             </div>
 
             {loading && mergedTeams.length === 0 ? (
-              <div className="h-64 bg-slate-800/20 animate-pulse rounded-2xl border border-slate-800" />
+              <div className="h-96 glass-panel animate-pulse rounded-3xl border border-white/5" />
             ) : (
-              <>
+              <div className="space-y-6">
                 <StandingsTable
                   teams={sortedTeams}
                   selectedTeams={selectedTeamIds}
                   onToggleRecord={handleToggleRecord}
                   onToggleSelect={toggleTeamSelection}
                 />
-                <ESPNTable teams={sortedTeams} selectedTeams={selectedTeamIds} />
-              </>
+                <div className="md:block hidden">
+                  <ESPNTable teams={sortedTeams} selectedTeams={selectedTeamIds} />
+                </div>
+              </div>
             )}
           </div>
 
-          <aside className="lg:col-span-1 h-fit lg:sticky lg:top-24 space-y-6">
+          <aside className="lg:col-span-4 xl:col-span-3 h-fit lg:sticky lg:top-24 space-y-6">
             <Scoreboard
               playerStats={playerStats}
               loading={loading}
